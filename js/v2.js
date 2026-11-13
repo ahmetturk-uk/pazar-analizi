@@ -185,9 +185,9 @@
     const bw = Math.min(64, a.iw / n * 0.62), x = i => a.m.l + (i + 0.5) * a.iw / n;
     let g = a.g;
     labels.forEach((l, i) => {
-      g += `<rect class="hit" x="${x(i) - a.iw / n / 2}" y="${a.m.t}" width="${a.iw / n}" height="${a.ih}"${tipA(`${l}\nToplam: ${fmt(tots[i])}\n` + (line2 && line2.v[i] != null ? `${line2.name}: ${line2.fmt(line2.v[i])}\n` : '') + stack.slice().reverse().filter(k => k.v[i] > 0).map(k => `${k.name}: ${fmt(k.v[i])} (${pct(k.v[i] / (tots[i] || 1), 0)})`).join('\n'))}/>`;
+      g += `<rect class="hit" data-qi="${i}" data-q="${esc(l)}" data-tot="${esc(fmt(tots[i]))}" data-rows="${esc(JSON.stringify(stack.slice().reverse().filter(k => k.v[i] > 0).map(k => [k.name, fmt(k.v[i]), pct(k.v[i] / (tots[i] || 1), 0)])))}" x="${x(i) - a.iw / n / 2}" y="${a.m.t}" width="${a.iw / n}" height="${a.ih}"${tipA(`${l}\nToplam: ${fmt(tots[i])}\n` + (line2 && line2.v[i] != null ? `${line2.name}: ${line2.fmt(line2.v[i])}\n` : '') + stack.slice().reverse().filter(k => k.v[i] > 0).map(k => `${k.name}: ${fmt(k.v[i])} (${pct(k.v[i] / (tots[i] || 1), 0)})`).join('\n'))}/>`;
       let b = 0;
-      stack.forEach((k, si) => { const y0 = a.y(b), y1 = a.y(b + k.v[i]); b += k.v[i]; if (y0 - y1 > 0.5) g += `<rect data-s="${si}" class="segm" x="${(x(i) - bw / 2).toFixed(1)}" y="${(y1 + 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y0 - y1 - 1.5).toFixed(1)}" rx="2.5" fill="${k.color}"${tipA(`${k.name}\n${l}: ${fmt(k.v[i])} · toplamın ${pct(k.v[i] / (tots[i] || 1), 0)}`)}/>`; });
+      stack.forEach((k, si) => { const y0 = a.y(b), y1 = a.y(b + k.v[i]); b += k.v[i]; if (y0 - y1 > 0.5) g += `<rect data-s="${si}" data-qi="${i}" data-q="${esc(l)}" data-nm="${esc(k.name)}" data-val="${esc(fmt(k.v[i]))}" data-sh="${esc(pct(k.v[i] / (tots[i] || 1), 0))}" class="segm" x="${(x(i) - bw / 2).toFixed(1)}" y="${(y1 + 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, y0 - y1 - 1.5).toFixed(1)}" rx="2.5" fill="${k.color}"${tipA(`${k.name}\n${l}: ${fmt(k.v[i])} · toplamın ${pct(k.v[i] / (tots[i] || 1), 0)}`)}/>`; });
       const slot = a.iw / n, every = Math.max(1, Math.ceil(62 / slot)), show = (n - 1 - i) % every === 0; // skip labels that would collide
       g += `${show && slot * every >= 52 ? `<text x="${x(i)}" y="${a.y(tots[i]) - 7}" text-anchor="middle" class="lb b">${esc(fmt(tots[i]))}</text>` : ''}${show ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" class="ax">${esc(l)}</text>` : ''}`;
     });
@@ -215,7 +215,7 @@
       s.v.forEach((v, i) => { if (v != null) g += `<circle cx="${x(i).toFixed(1)}" cy="${yy(v).toFixed(1)}" r="3.5" fill="${s.right ? '#fff' : s.color}" stroke="${s.right ? s.color : '#fff'}" stroke-width="1.5"/>`; });
     });
     const cw = a.iw / Math.max(1, n - 1);
-    labels.forEach((l, i) => { g += `<rect class="hit" x="${x(i) - cw / 2}" y="${a.m.t}" width="${cw}" height="${a.ih}"${tipA(l + '\n' + series.filter(s => s.v[i] != null).map(s => `${s.name}: ${(s.right ? fmt2 : fmt)(s.v[i])}`).join('\n'))}/>`; });
+    labels.forEach((l, i) => { g += `<rect class="hit" data-qi="${i}" data-q="${esc(l)}" data-rows="${esc(JSON.stringify(series.filter(s => s.v[i] != null).map(s => [s.name, (s.right ? fmt2 : fmt)(s.v[i])])))}" x="${x(i) - cw / 2}" y="${a.m.t}" width="${cw}" height="${a.ih}"${tipA(l + '\n' + series.filter(s => s.v[i] != null).map(s => `${s.name}: ${(s.right ? fmt2 : fmt)(s.v[i])}`).join('\n'))}/>`; });
     return svg(W, H, g, 'Trend') + (series.length > 1 && !opt.noLegend ? legend(series.map(s => s.right ? { ...s, dash: true } : s)) : '');
   }
   function scatter(W, pts, fx, xName, yName) {
@@ -596,10 +596,25 @@
   document.addEventListener('dragleave', e => { const z = e.target.closest('[data-zone]'); if (z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
   document.addEventListener('drop', e => { e.preventDefault(); const z = e.target.closest('[data-zone]'), fs = [...e.dataTransfer.files]; if (z) z.classList.remove('over'); if (fs.length) stage(fs, (z && z.dataset.zone) || undefined, z ? z.dataset.seg : undefined); });
   document.addEventListener('mousemove', e => { const t = e.target.closest && e.target.closest('[data-tip]'), tip = $('#tip'); if (!t) { tip.hidden = true; return; }
-    tip.innerHTML = tipHTML(t.dataset.tip); tip.hidden = false; const tw = tip.offsetWidth, thh = tip.offsetHeight;
+    tip.innerHTML = pairTip(t) || tipHTML(t.dataset.tip); tip.hidden = false; const tw = tip.offsetWidth, thh = tip.offsetHeight;
     tip.style.left = Math.max(8, e.clientX + 14 + tw > innerWidth ? e.clientX - tw - 14 : e.clientX + 14) + 'px'; tip.style.top = Math.min(innerHeight - thh - 8, e.clientY + 14) + 'px'; });
   document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('.info'), tip = $('#tip'); if (!t) return; const r = t.getBoundingClientRect(); tip.innerHTML = tipHTML(t.dataset.tip); tip.hidden = false; tip.style.left = Math.max(8, Math.min(innerWidth - tip.offsetWidth - 8, r.left)) + 'px'; tip.style.top = (r.bottom + 8) + 'px'; });
   document.addEventListener('focusout', e => { if (e.target.closest && e.target.closest('.info')) $('#tip').hidden = true; });
+  /* hovering either chart of a Gelir | İndirme pair shows the matching value from the other chart as well */
+  function pairTip(t) {
+    const col = t.closest('.pair .pcol'); if (!col || t.dataset.qi == null) return '';
+    const cols = [...col.parentElement.querySelectorAll(':scope > .pcol')], i = cols.indexOf(col), other = cols[1 - i]; if (!other) return '';
+    const sel = t.classList.contains('segm') ? `.segm[data-s="${t.dataset.s}"][data-qi="${t.dataset.qi}"]` : `.hit[data-qi="${t.dataset.qi}"]`;
+    const o = other.querySelector(sel), rev = i === 0 ? t : o, dl = i === 0 ? o : t;
+    const D = x => (x ? x.dataset : {});
+    if (t.classList.contains('segm')) {
+      const R = D(rev), Q = D(dl);
+      return `<b>${esc(t.dataset.nm)}</b><p>${esc(t.dataset.q)}</p><table class="tt"><tr><td><i class="k rev"></i>Gelir</td><td>${esc(R.val || '–')}</td><td>${R.sh ? 'toplamın ' + esc(R.sh) : ''}</td></tr><tr><td><i class="k dl"></i>İndirme</td><td>${esc(Q.val || '–')}</td><td>${Q.sh ? 'toplamın ' + esc(Q.sh) : ''}</td></tr></table>`;
+    }
+    const rr = new Map(JSON.parse(D(rev).rows || '[]').map(r => [r[0], r])), dd = new Map(JSON.parse(D(dl).rows || '[]').map(r => [r[0], r]));
+    const names = [...new Set([...rr.keys(), ...dd.keys()])];
+    return `<b>${esc(t.dataset.q)}</b><table class="tt"><tr><th></th><th><i class="k rev"></i>Gelir</th><th><i class="k dl"></i>İndirme</th></tr>${D(rev).tot ? `<tr class="tot"><td>Toplam</td><td>${esc(D(rev).tot)}</td><td>${esc(D(dl).tot || '–')}</td></tr>` : ''}${names.map(n => `<tr><td>${esc(n)}</td><td>${esc(rr.get(n)?.[1] || '–')}</td><td>${esc(dd.get(n)?.[1] || '–')}</td></tr>`).join('')}</table>`;
+  }
   /* tooltip text → title line, paragraphs and a hanging-indent list (all escaped) */
   const tipHTML = txt => { const L = String(txt).split('\n'); let h = '', ul = false;
     L.forEach((l, i) => { const b = /^•\s*/.test(l);
