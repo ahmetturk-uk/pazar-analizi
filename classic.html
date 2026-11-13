@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pazar Analizi · Anka Ventures</title>
+<link rel="icon" href="anka-mark.svg">
+<link rel="stylesheet" href="styles.css?v=20261112094320">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#ozet">
+    <span class="brand-mark"><img src="anka-mark.svg" alt=""></span>
+    <span class="brand-text"><b>Pazar Analizi</b><small>Anka Ventures · Sensor Tower verisi</small></span>
+  </a>
+  <nav id="nav" aria-label="Bölümler"></nav>
+</header>
+<div id="banner"></div>
+<main id="app"></main>
+<footer class="foot">Veriler yalnızca bu tarayıcıda saklanır. Kaynak: Sensor Tower dışa aktarımları.</footer>
+
+<dialog id="dlg"><form method="dialog" id="dlgBody"></form></dialog>
+<div id="tip" class="tip" hidden></div>
+<input type="file" id="filePick" accept=".csv,.tsv,.txt" multiple hidden>
+
+<script src="js/parse.js?v=20261112094320"></script>
+<script src="js/charts.js?v=20261112094320"></script>
+<script src="js/sample.js?v=20261112094320"></script>
+<script src="js/app.js?v=20261112094320"></script>
+</body>
+</html>
