@@ -13,6 +13,13 @@
     ['data', 'Veri Yönetimi', '<ellipse cx="8" cy="4" rx="5.5" ry="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 4v8c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V4M2.5 8c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>'],
   ];
   const AI_RE = /(^|[^a-z])(ai|chatbot|chat ?bot|copilot|gemini|claude|llm|genai|assistant)([^a-z]|$)|gpt/i; // "gpt" anywhere, so ChatGPT counts
+  /* Known AI-first publishers (names as Sensor Tower writes them). Mixed giants such as Google, ByteDance,
+     Microsoft, Meta, Baidu and Alibaba are left out on purpose, otherwise YouTube, TikTok, Gmail … would count as AI. */
+  const AI_PUBS = new Set(['openai', 'anthropic', 'perplexityai', 'perplexity ai', 'perplexity', 'character.ai', 'character technologies', 'x.ai', 'xai', 'x.ai corp',
+    'mistral ai', 'deepseek', 'hangzhou deepseek artificial intelligence', 'moonshot ai', 'minimax', 'zhipu ai', 'suno', 'runwayml', 'runway ai', 'elevenlabs',
+    'chai research', 'luka', 'kindroid', 'nomi.ai', 'genspark', 'otter.ai', 'inflection ai', 'midjourney', 'stability ai', 'pika labs', 'polyverse']);
+  const AI_PUB_RE = /^$/; // no generic "AI in publisher name" rule: it tagged non-AI apps (e.g. Dramawave by SKYWORK AI)
+  const aiReason = r => { if (AI_RE.test(r.name)) return 'name'; const pb = String(r.pub || '').trim().toLowerCase(); return pb && (AI_PUBS.has(pb) || AI_PUB_RE.test(pb)) ? 'pub' : ''; };
 
   /* ---------- state ---------- */
   const F = { metric: 'both', period: '', from: '', pick: '', cal: false, cmp: 'yoy', dev: '', ctry: '', pop: false, appCat: '', appQ: '', appLim: 10, pubQ: '', pubLim: 10, catLim: 10, tagQ: '', tagOnly: '', sort: { cat: ['v', -1] } };
@@ -75,7 +82,7 @@
   }
   function pubSource() { for (const g of ['', 'ai', 'nonai']) { const rows = raw('publishers', g); if (rows.length) return { rows, g }; } return { rows: [], g: '' }; }
   let aiMemo = new Map();
-  const isAI = r => { let v = aiMemo.get(r.name); if (v === undefined) { const k = r.name.toLowerCase(); aiMemo.set(r.name, v = AI.tags.has(k) || (AI.auto && !AI.ex.has(k) && AI_RE.test(r.name))); } return v; };
+  const isAI = r => { let v = aiMemo.get(r.name); if (v === undefined) { const k = r.name.toLowerCase(); aiMemo.set(r.name, v = AI.tags.has(k) || (AI.auto && !AI.ex.has(k) && !!aiReason(r))); } return v; };
 
   const periods = rows => { const s = new Set(); for (const r of rows) s.add(r.p); return [...s].sort(); };
   const isPartial = p => new Date() < new Date(+p.slice(0, 4), +p.slice(6) * 3, 1);
@@ -157,7 +164,7 @@
     share: 'Pay\n• Yayıncının toplam gelirdeki payıdır.\n• Pazarın tamamına göre değil, yüklenen dosyadaki yayıncılara göre hesaplanır.',
     partial: 'Yarım dönem\n• Henüz bitmemiş bir çeyrektir.\n• Rakamları eksik olduğu için trendlere ve karşılaştırmalara dahil edilmez.',
     aiGroups: 'AI kullanan ve AI kullanmayan yayıncılar\n• İki ayrı yayıncı dosyasını yan yana karşılaştırır.\n• Sol taraf: AI kullanan yayıncılar dosyası.\n• Sağ taraf: AI kullanmayan yayıncılar dosyası.\n• Değerlerin altındaki rozetler, karşılaştırma dönemine göre değişimi gösterir.',
-    aiTag: 'AI uygulamalarını etiketleme\n• Hangi uygulamaların yapay zekâ uygulaması sayılacağını belirler.\n• Adında AI, GPT, Chatbot, Copilot, Gemini, Claude ya da Assistant geçen uygulamalar otomatik olarak seçilir.\n• Listedeki kutuları işaretleyerek ya da işareti kaldırarak seçimi düzeltebilirsin.',
+    aiTag: 'AI uygulamalarını etiketleme\n• Hangi uygulamaların yapay zekâ uygulaması sayılacağını belirler.\n• Adında AI, GPT, Chatbot, Copilot, Gemini, Claude ya da Assistant geçen uygulamalar otomatik olarak seçilir.\n• Bilinen yapay zekâ şirketlerinin (OpenAI, Anthropic, Perplexity, Character.AI, Mistral, Moonshot, MiniMax, Suno, Runway, ElevenLabs, Chai, Replika, Kindroid, Nomi, Genspark, Otter gibi) bütün uygulamaları da seçilir.\n• Google, Microsoft, Meta, ByteDance, Baidu ve Alibaba gibi karma şirketler dahil edilmez; onların AI uygulamaları yalnızca adlarından yakalanır.\n• Listedeki kutuları işaretleyerek ya da işareti kaldırarak seçimi düzeltebilirsin.',
     sparkline: '8 çeyreklik trend\n• Kategorinin son 8 çeyrekteki seyrini gösteren küçük grafiktir.\n• Her satırın grafiği kendi ölçeğindedir.\n• Satırlar arasında yükseklik değil, yön karşılaştırılır: yükseliyor mu, düşüyor mu?',
   };
   const info = k => `<i class="info" tabindex="0" role="img" aria-label="${esc(HELP[k])}"${tipA(HELP[k])}>!</i>`;
@@ -420,8 +427,8 @@
         ${kpi('Pazar gelirindeki pay', mkT ? pct(sum(at(ai, p), 'rev') / mkT) : '—', mkT ? ql(p) : 'Kategori verisi gerekli')}${kpi('İzlenen AI uygulaması', nf(cur.length, 0), `tüm çeyreklerde ${nf(nTag, 0)} etiketli`)}</div>
       <div class="two">${card('AI segmenti trendi', both ? 'Etiketli uygulamaların geliri (solda) ve indirmesi (sağda)' : `Etiketli uygulamaların ${m === 'rev' ? 'geliri' : 'indirmesi'}`, last8.length > 1 ? (both ? pair(W => stackedBars(W, last8.map(ql), [{ name: 'AI uygulamaları', color: PAL[0], v: last8.map(x => sum(at(ai, x), 'rev')) }], money, null, { noLegend: true }), W => stackedBars(W, last8.map(ql), [{ name: 'AI uygulamaları', color: '#3FA58C', v: last8.map(x => sum(at(ai, x), 'dl')) }], num, null, { noLegend: true })) : plot(W => stackedBars(W, last8.map(ql), [{ name: 'AI uygulamaları', color: PAL[0], v: last8.map(x => sum(at(ai, x), m)) }], f))) : '<p class="muted">Trend için en az iki çeyreklik uygulama verisi yükle.</p>')}
         ${card('En büyük AI uygulamaları', `${ql(p)} · ${both ? 'gelir, indirme ve gelirin ' : ''}${cmpName.toLocaleLowerCase('tr')} değişim`, cur.length ? `<table><tbody>${cur.slice(0, 8).map((r, i) => { const pr = c && at(ai, c).find(x => x.name.toLowerCase() === r.name.toLowerCase()); return `<tr><td class="rank">${i + 1}</td><td class="name">${link(r, esc(r.name))}</td>${both ? `<td class="r num">${money(r.rev)}</td><td class="r num muted">${num(r.dl)}</td>` : `<td class="r num">${f(r[m])}</td>`}<td class="r">${pill(pr ? delta(r[m], pr[m]) : null)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="muted">Bu çeyrek için etiketli AI uygulaması yok.</p>')}</div>
-      ${card(`AI uygulamalarını etiketle ${info('aiTag')}`, `Otomatik etiketleme adında AI, GPT, Chatbot, Copilot, Gemini, Claude, Assistant geçen uygulamaları işaretler. İstediğin uygulamanın kutusunu işaretleyip kaldırarak düzeltebilirsin.`, `<div class="toolbar"><div class="seg" role="group" aria-label="Göster"><button data-set="tagOnly:" class="${F.tagOnly ? '' : 'on'}">Tüm uygulamalar</button><button data-set="tagOnly:1" class="${F.tagOnly ? 'on' : ''}">Etiketli · ${nf(nTag, 0)}</button></div><input class="input grow" id="tagQ" type="search" data-q="tagQ" value="${esc(F.tagQ)}" placeholder="Uygulama ya da yayıncı ara"></div>
-        <div class="taglist">${list.slice(0, 200).map(r => `<label><input type="checkbox" data-tag="${esc(r.name.toLowerCase())}" ${isAI(r) ? 'checked' : ''}><span>${esc(r.name)}<small>${esc(r.pub)}${r.cat ? ' · ' + esc(r.cat) : ''}</small></span><em>${money(r.rev)}</em></label>`).join('')}</div>`,
+      ${card(`AI uygulamalarını etiketle ${info('aiTag')}`, `Otomatik etiketleme adında AI, GPT, Chatbot, Copilot, Gemini, Claude, Assistant geçen uygulamaları ve bilinen yapay zekâ şirketlerinin uygulamalarını işaretler. Yanında “yayıncıdan” yazanlar yayıncısı nedeniyle seçildi. İstediğin uygulamanın kutusunu işaretleyip kaldırarak düzeltebilirsin.`, `<div class="toolbar"><div class="seg" role="group" aria-label="Göster"><button data-set="tagOnly:" class="${F.tagOnly ? '' : 'on'}">Tüm uygulamalar</button><button data-set="tagOnly:1" class="${F.tagOnly ? 'on' : ''}">Etiketli · ${nf(nTag, 0)}</button></div><input class="input grow" id="tagQ" type="search" data-q="tagQ" value="${esc(F.tagQ)}" placeholder="Uygulama ya da yayıncı ara"></div>
+        <div class="taglist">${list.slice(0, 200).map(r => `<label><input type="checkbox" data-tag="${esc(r.name.toLowerCase())}" ${isAI(r) ? 'checked' : ''}><span>${esc(r.name)}<small>${esc(r.pub)}${r.cat ? ' · ' + esc(r.cat) : ''}</small>${AI.auto && !AI.tags.has(r.name.toLowerCase()) && aiReason(r) === 'pub' ? '<em class="why">yayıncıdan</em>' : ''}</span><em>${money(r.rev)}</em></label>`).join('')}</div>`,
         `<label class="btn"><input type="checkbox" data-auto ${AI.auto ? 'checked' : ''} style="accent-color:#6B2AE6"> Anahtar sözcükle otomatik etiketle</label>`)}`;
   }
 

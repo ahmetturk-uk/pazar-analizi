@@ -482,3 +482,4 @@ tr.picked td { background: #F7F3FF; }
 .tip .tt td:nth-child(3) { color: #fff; font-weight: 600; }
 .tip .k { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; } .tip .k.rev { background: #B39BF2; } .tip .k.dl { background: #6CC5AE; }
 .tip p + table.tt td:nth-child(3) { font-weight: 400; color: #CFC5EE; }
+.taglist .why { font-style: normal; font-size: 11px; font-weight: 600; color: #1F6E5A; background: #E6F5F0; padding: 1px 7px; border-radius: 999px; margin-left: 8px; }
