@@ -380,9 +380,17 @@
     const src = pubSource(), rows = src.rows;
     if (!rows.length) return empty('Henüz yayıncı verisi yok', 'Yoğunlaşma oranları ve hâkimiyet eğrisi için En büyük yayıncılar dosyalarını yükle.');
     const { p, c, last8, cmpText } = ctx(rows), both = F.metric === 'both', m = both ? 'rev' : F.metric, f = fm(m);
-    const stat = q => { const r = at(rows, q).sort((a, b) => b.rev - a.rev), t = sum(r, 'rev'), cr = n => (t ? sum(r.slice(0, n), 'rev') / t : null); return { r, t, c10: cr(10), c50: cr(50), c100: cr(100) }; };
-    const s = stat(p), pv = c ? stat(c) : { r: [], t: 0 }, pmap = new Map(pv.r.map(r => [r.name.toLowerCase(), r.rev]));
-    const crk = (label, a, b) => kpi(label, a == null ? '—' : pct(a), `${pill(a != null && b != null ? a - b : null, true)} ${cmpText}`);
+    /* concentration is measured on the chosen measure: CR on revenue, on downloads, or both side by side */
+    const stat = (q, k = 'rev') => { const r = at(rows, q).sort((a, b) => b[k] - a[k]), t = sum(r, k), cr = n => (t ? sum(r.slice(0, n), k) / t : null); return { r, t, c10: cr(10), c50: cr(50), c100: cr(100) }; };
+    const s = stat(p, m), pv = c ? stat(c, m) : { r: [], t: 0 }, pmap = new Map(pv.r.map(r => [r.name.toLowerCase(), r[m]]));
+    const sD = stat(p, 'dl'), pvD = c ? stat(c, 'dl') : { r: [], t: 0 };
+    const sub2 = (a, b, pp) => `${pill(a != null && b != null ? (pp ? a - b : delta(a, b)) : null, pp)}`;
+    const crk = (label, k) => both
+      ? `<div class="kpi kpi2"><span>${withHelp(label)}</span><div class="kv"><div><small class="kt rev">Gelir</small><b>${s[k] == null ? '—' : pct(s[k])}</b>${sub2(s[k], pv[k], true)}</div><div><small class="kt dl">İndirme</small><b>${sD[k] == null ? '—' : pct(sD[k])}</b>${sub2(sD[k], pvD[k], true)}</div></div><small>${cmpText}</small></div>`
+      : kpi(label, s[k] == null ? '—' : pct(s[k]), `${pill(s[k] != null && pv[k] != null ? s[k] - pv[k] : null, true)} ${cmpText}`);
+    const totK = both
+      ? `<div class="kpi kpi2"><span>${withHelp(`Gelir · ${nf(s.r.length, 0)} yayıncı`)}</span><div class="kv"><div><small class="kt rev">Gelir</small><b>${money(s.t)}</b>${sub2(s.t, c ? pv.t : null)}</div><div><small class="kt dl">İndirme</small><b>${num(sD.t)}</b>${sub2(sD.t, c ? pvD.t : null)}</div></div><small>${cmpText}</small></div>`
+      : kpi(`${m === 'rev' ? 'Gelir' : 'İndirme'} · ${nf(s.r.length, 0)} yayıncı`, f(s.t), `${pill(c ? delta(s.t, pv.t) : null)} ${cmpText}`);
     const segStat = g => { const all = raw('publishers', g), r = at(all, p), rev = sum(r, 'rev'), dl = sum(r, 'dl'), pr = c ? at(all, c) : [], byRev = [...r].sort((a, b) => b.rev - a.rev);
       const pRev = sum(pr, 'rev'), pDl = sum(pr, 'dl'), pBy = [...pr].sort((a, b) => b.rev - a.rev);
       const prev = pr.length ? { rev: pRev, dl: pDl, n: pr.length, avg: pRev / pr.length, rpd: pDl ? pRev / pDl : null, top10: pRev ? sum(pBy.slice(0, 10), 'rev') / pRev : null } : null;
@@ -404,13 +412,15 @@
         ${segL8.length > 1 && A.all.length && B.all.length ? `<div style="margin-top:22px">${(() => { const ser = k => ['ai', 'nonai'].map(g => ({ name: SEG[g], color: SEGC[g], v: segL8.map(x => { const r = at(g === 'ai' ? A.all : B.all, x); return r.length ? sum(r, k) : null; }) }));
           return both ? pair(W => lines(W, segL8.map(ql), ser('rev'), money, null, null, { noLegend: true }), W => lines(W, segL8.map(ql), ser('dl'), num, null, null, { noLegend: true }), `<div class="plot">${legend(ser('rev'))}</div>`) : plot(W => lines(W, segL8.map(ql), ser(m), f)); })()}</div>` : ''}`) : '';
     const q = F.pubQ.trim().toLowerCase(); let cum = 0;
-    const tbl = s.r.map((r, i) => ({ r, rank: i + 1, share: r.rev / (s.t || 1), cum: (cum += r.rev) / (s.t || 1) })).filter(o => !q || o.r.name.toLowerCase().includes(q));
-    return `<div class="kpis">${crk(`CR10 ${info('CR10')} · ilk 10’un payı`, s.c10, pv.c10)}${crk(`CR50 ${info('CR50')} · ilk 50’nin payı`, s.c50, pv.c50)}${crk(`CR100 ${info('CR100')} · ilk 100’ün payı`, s.c100, pv.c100)}${kpi(`Gelir · ${nf(s.r.length, 0)} yayıncı`, money(s.t), `${pill(c ? delta(s.t, pv.t) : null)} ${cmpText}`)}</div>
-      <div class="two">${card('Yoğunlaşma eğrisi', `En büyükten küçüğe birikimli gelir payı · ${ql(p)}`, plot(W => pareto(W, s.r.map(x => x.rev))))}
-        ${card(`Zaman içinde yoğunlaşma ${info('CR10')}`, 'İlk 10, 50 ve 100 yayıncının gelir payı (CR10, CR50, CR100)', last8.length > 1 ? plot(W => lines(W, last8.map(ql), [['CR10', 'c10', PAL[0]], ['CR50', 'c50', PAL[1]], ['CR100', 'c100', PAL[3]]].map(([name, k, color]) => ({ name, color, v: last8.map(x => stat(x)[k]) })), v => pct(v, 0), 1)) : '<p class="muted">Trend için en az iki çeyrek yükle.</p>')}</div>
+    const tbl = s.r.map((r, i) => ({ r, rank: i + 1, share: r[m] / (s.t || 1), cum: (cum += r[m]) / (s.t || 1) })).filter(o => !q || o.r.name.toLowerCase().includes(q));
+    const mWord = both ? 'gelir ve indirme' : m === 'rev' ? 'gelir' : 'indirme';
+    const crSeries = k => [['CR10', 'c10', PAL[0]], ['CR50', 'c50', PAL[1]], ['CR100', 'c100', PAL[3]]].map(([name, key, color]) => ({ name, color, v: last8.map(x => stat(x, k)[key]) }));
+    return `<div class="kpis">${crk(`CR10 ${info('CR10')} · ilk 10’un payı`, 'c10')}${crk(`CR50 ${info('CR50')} · ilk 50’nin payı`, 'c50')}${crk(`CR100 ${info('CR100')} · ilk 100’ün payı`, 'c100')}${totK}</div>
+      ${card('Yoğunlaşma eğrisi', `En büyükten küçüğe birikimli ${mWord} payı · ${ql(p)}`, both ? pair(W => pareto(W, s.r.map(x => x.rev)), W => pareto(W, sD.r.map(x => x.dl))) : plot(W => pareto(W, s.r.map(x => x[m]))))}
+      ${card(`Zaman içinde yoğunlaşma ${info('CR10')}`, `İlk 10, 50 ve 100 yayıncının ${mWord} payı (CR10, CR50, CR100)`, last8.length > 1 ? (both ? pair(W => lines(W, last8.map(ql), crSeries('rev'), v => pct(v, 0), 1, null, { noLegend: true }), W => lines(W, last8.map(ql), crSeries('dl'), v => pct(v, 0), 1, null, { noLegend: true }), `<div class="plot">${legend(crSeries('rev'))}</div>`) : plot(W => lines(W, last8.map(ql), crSeries(m), v => pct(v, 0), 1))) : '<p class="muted">Trend için en az iki çeyrek yükle.</p>')}
       ${compare}
-      ${card('Yayıncılar', `${ql(p)} · gelire göre sıralı${src.g ? ` · “${SEG[src.g]}” dosyalarından` : ''}`, `<div class="tw"><table><thead><tr><th>#</th><th>Yayıncı</th><th class="r">Gelir</th><th class="r">Pay ${info('share')}</th><th class="r">Birikimli ${info('cum')}</th><th class="r">İndirme</th><th class="r">${F.cmp === 'yoy' ? 'Yıllık' : 'Çeyreklik'}</th></tr></thead>
-        <tbody>${tbl.slice(0, F.pubLim).map(o => `<tr><td class="rank">${o.rank}</td><td class="name">${link(o.r, esc(o.r.name))}</td><td class="r num">${money(o.r.rev)}</td><td class="r num">${pct(o.share)}</td><td class="r num muted">${pct(o.cum)}</td><td class="r num">${num(o.r.dl)}</td><td class="r">${pill(delta(o.r.rev, pmap.get(o.r.name.toLowerCase())))}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Eşleşen yayıncı yok.</td></tr>'}</tbody></table></div>
+      ${card('Yayıncılar', `${ql(p)} · ${m === 'rev' ? 'gelire' : 'indirmeye'} göre sıralı${src.g ? ` · “${SEG[src.g]}” dosyalarından` : ''}`, `<div class="tw"><table><thead><tr><th>#</th><th>Yayıncı</th><th class="r">Gelir</th><th class="r">${m === 'rev' ? 'Gelir' : 'İndirme'} payı ${info('share')}</th><th class="r">Birikimli ${info('cum')}</th><th class="r">İndirme</th><th class="r">${F.cmp === 'yoy' ? 'Yıllık' : 'Çeyreklik'}</th></tr></thead>
+        <tbody>${tbl.slice(0, F.pubLim).map(o => `<tr><td class="rank">${o.rank}</td><td class="name">${link(o.r, esc(o.r.name))}</td><td class="r num">${money(o.r.rev)}</td><td class="r num">${pct(o.share)}</td><td class="r num muted">${pct(o.cum)}</td><td class="r num">${num(o.r.dl)}</td><td class="r">${pill(delta(o.r[m], pmap.get(o.r.name.toLowerCase())))}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Eşleşen yayıncı yok.</td></tr>'}</tbody></table></div>
         ${tbl.length > F.pubLim ? `<button class="btn more" data-more="pubLim">10 tane daha göster · ${nf(tbl.length - F.pubLim, 0)} kaldı</button>` : ''}`, `<input class="input" id="pubQ" type="search" data-q="pubQ" value="${esc(F.pubQ)}" placeholder="Yayıncı ara" style="width:220px">`)}
       <p class="note">Paylar pazarın tamamına değil, yüklenen dosyalardaki yayıncılara göre hesaplanır.</p>`;
   }
